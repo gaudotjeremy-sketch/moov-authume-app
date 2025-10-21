@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Admin - Moov Authume</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 20px;
+}
+table {
+  border-collapse: collapse;
+  margin: 0 auto;
+  width: 90%;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+th {
+  background-color: #f0f0f0;
+}
+button {
+  margin-top: 10px;
+  padding: 6px 12px;
+}
+</style>
+</head>
+<body>
+
+<img src="logo.png" alt="Logo Moov Authume" style="height:100px;">
+<h1>Administration Moov Authume</h1>
+<hr>
+
+<h2>Créer un adhérent</h2>
+Nom : <input id="nom"><br>
+Prénom : <input id="prenom"><br>
+Email : <input id="email"><br>
+Validité (YYYY-MM-DD) : <input id="valid_until"><br>
+<button onclick="createMember()">Créer adhérent</button>
+
+<h2>Liste des adhérents</h2>
+<table id="membersTable">
+<thead>
+<tr>
+<th>Nom</th><th>Prénom</th><th>Email</th><th>Validité</th><th>QR Code</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+function loadMembers(){
+  fetch('/members').then(r=>r.json()).then(data=>{
+    const tbody=document.querySelector('#membersTable tbody');
+    tbody.innerHTML='';
+    data.forEach(m=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td>${m.nom}</td>
+        <td>${m.prenom}</td>
+        <td>${m.email}</td>
+        <td>${m.valid_until||'-'}</td>
+        <td><img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(m.token)}"></td>`;
+      tbody.appendChild(tr);
+    });
+  });
+}
+function createMember(){
+  const nom=document.getElementById('nom').value;
+  const prenom=document.getElementById('prenom').value;
+  const email=document.getElementById('email').value;
+  const valid_until=document.getElementById('valid_until').value;
+  fetch('/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,prenom,email,valid_until})})
+  .then(r=>r.json()).then(()=>loadMembers());
+}
+loadMembers();
+</script>
+
+</body>
+</html>
