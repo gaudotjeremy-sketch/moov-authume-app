@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Scanner - Moov Authume</title>
+<style>
+body { font-family: Arial, sans-serif; text-align:center; margin: 20px; }
+input { margin: 5px; padding: 5px; }
+button { padding: 6px 12px; }
+#msg { margin-top: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<img src="logo.png" alt="Logo Moov Authume" style="height:100px;">
+<h1>Scanner - Moov Authume</h1>
+<hr>
+
+<p>Bénévole : <input id="volunteer"><br>
+Événement ID : <input id="eventId"><br>
+QR code : <input id="qr">
+<button onclick="scanQR()">Scanner</button></p>
+
+<div id="msg"></div>
+
+<script>
+function scanQR(){
+  const token=document.getElementById('qr').value;
+  const eventId=document.getElementById('eventId').value;
+  const volunteer=document.getElementById('volunteer').value;
+  fetch('/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,eventId,volunteer})})
+  .then(r=>r.json()).then(j=>{
+    const m=document.getElementById('msg');
+    if(j.success){
+      m.style.color='green';
+      m.innerHTML=`✅ Boisson donnée à ${j.member.nom} (${volunteer})`;
+    } else if(j.redeemed_by){
+      m.style.color='orange';
+      m.innerHTML=`⚠️ Déjà scanné par ${j.redeemed_by} à ${new Date(j.redeemed_at).toLocaleTimeString()}`;
+    } else {
+      m.style.color='red';
+      m.innerHTML=`❌ ${j.error}`;
+    }
+  });
+}
+</script>
+
+</body>
+</html>
