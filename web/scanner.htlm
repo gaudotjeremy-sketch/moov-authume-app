@@ -1,49 +1,84 @@
-<!DOCTYPE html>
-<html lang="fr">
+<!doctype html>
+<html>
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <title>Scanner - Moov Authume</title>
-<style>
-body { font-family: Arial, sans-serif; text-align:center; margin: 20px; }
-input { margin: 5px; padding: 5px; }
-button { padding: 6px 12px; }
-#msg { margin-top: 20px; font-weight: bold; }
-</style>
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 </head>
 <body>
+<div class="container">
+  <div class="header">
+    <img src="logo.png" class="logo">
+    <h1>Moov Authume — Scanner</h1>
+  </div>
 
-<img src="logo.png" alt="Logo Moov Authume" style="height:100px;">
-<h1>Scanner - Moov Authume</h1>
-<hr>
+  <div class="card">
+    <label>Bénévole :
+      <select id="volSelect"></select>
+    </label>
+    <label>Événement :
+      <select id="eventSelect"></select>
+    </label>
+    <label>Type de bon :
+      <select id="voucherSelect"><option value="">-- choisir --</option></select>
+    </label>
+    <p class="small">Scannez le QR du membre (ou copiez-collez le token ci-dessous)</p>
 
-<p>Bénévole : <input id="volunteer"><br>
-Événement ID : <input id="eventId"><br>
-QR code : <input id="qr">
-<button onclick="scanQR()">Scanner</button></p>
+    <div id="reader" style="width:300px;margin:0 auto;"></div>
+    <p class="center">ou</p>
+    <input id="manualToken" placeholder="Coller token ici">
+    <button onclick="manualScan()">Valider token</button>
 
-<div id="msg"></div>
+    <div id="result" style="margin-top:12px;font-weight:bold;"></div>
+  </div>
+</div>
 
 <script>
-function scanQR(){
-  const token=document.getElementById('qr').value;
-  const eventId=document.getElementById('eventId').value;
-  const volunteer=document.getElementById('volunteer').value;
-  fetch('/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,eventId,volunteer})})
-  .then(r=>r.json()).then(j=>{
-    const m=document.getElementById('msg');
-    if(j.success){
-      m.style.color='green';
-      m.innerHTML=`✅ Boisson donnée à ${j.member.nom} (${volunteer})`;
-    } else if(j.redeemed_by){
-      m.style.color='orange';
-      m.innerHTML=`⚠️ Déjà scanné par ${j.redeemed_by} à ${new Date(j.redeemed_at).toLocaleTimeString()}`;
-    } else {
-      m.style.color='red';
-      m.innerHTML=`❌ ${j.error}`;
-    }
-  });
-}
-</script>
+async function loadSelects(){
+  const vres = await fetch('/api/volunteers'); const volunteers = await vres.json();
+  const volSel = document.getElementById('volSelect'); volSel.innerHTML='';
+  volunteers.forEach(v=>{ const o=document.createElement('option'); o.value=v.name; o.textContent=v.name; volSel.appendChild(o); });
 
+  const eres = await fetch('/api/events'); const events = await eres.json();
+  const evSel = document.getElementById('eventSelect'); evSel.innerHTML='';
+  events.forEach(e=>{ const o=document.createElement('option'); o.value=e.id; o.textContent=e.name + ' ('+(e.date||'-')+')'; evSel.appendChild(o); });
+
+  const vtres = await fetch('/api/voucher_types'); const vtypes = await vtres.json();
+  const vtSel = document.getElementById('voucherSelect'); vtSel.innerHTML='<option value="">-- choisir --</option>';
+  vtypes.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; vtSel.appendChild(o); });
+}
+loadSelects();
+
+async function doRedeem(token){
+  const volunteer = document.getElementById('volSelect').value;
+  const eventId = document.getElementById('eventSelect').value;
+  const voucherTypeId = document.getElementById('voucherSelect').value || null;
+  const res = await fetch('/api/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,eventId,volunteer,voucherTypeId})});
+  const j = await res.json();
+  const out = document.getElementById('result');
+  if(j.success){ out.style.color='green'; out.innerText = `✅ OK — ${j.member.nom} ${j.member.prenom}`; }
+  else if(j.redeemed_by){ out.style.color='orange'; out.innerText = `⚠️ Déjà scanné par ${j.redeemed_by} à ${new Date(j.redeemed_at).toLocaleTimeString()}`; }
+  else { out.style.color='red'; out.innerText = `❌ ${j.error}`; }
+}
+
+function manualScan(){ const t=document.getElementById('manualToken').value.trim(); if(!t) return alert('Collez le token'); doRedeem(t); }
+
+// camera scanner
+const html5QrCode = new Html5Qrcode("reader");
+const config = { fps: 10, qrbox: 250 };
+Html5Qrcode.getCameras().then(cameras=>{
+  if(cameras && cameras.length){
+    html5QrCode.start(cameras[0].id, config, (decodedTxt, decodedResult)=>{
+      doRedeem(decodedTxt);
+      html5QrCode.pause(); setTimeout(()=>html5QrCode.resume(), 2000);
+    }, (error)=>{ /* ignore */ });
+  } else {
+    document.getElementById('reader').innerText = 'Aucune caméra détectée';
+  }
+}).catch(err=>{
+  document.getElementById('reader').innerText = 'Erreur caméra: '+err;
+});
+</script>
 </body>
 </html>
