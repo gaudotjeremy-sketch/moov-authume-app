@@ -134,3 +134,9 @@ def validate_qr():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
+    member_name = qr_data.split("Adhérent: ")[1].split("|")[0].strip()
+    return jsonify({"status": "ok", "member": member_name})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
