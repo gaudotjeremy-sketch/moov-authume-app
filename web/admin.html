@@ -1,139 +1,15 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="fr">
 <head>
-<meta charset="utf-8">
-<title>Admin - Moov Authume</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Espace Admin - Moov Authume</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<div class="container">
-  <div class="header">
-    <img src="logo.png" class="logo">
-    <h1>Moov Authume — Administration</h1>
-  </div>
+<body class="bg-gray-100 text-gray-900">
 
-  <div style="text-align:right;margin-bottom:8px;">
-    <button onclick="logout()">Se déconnecter</button>
-  </div>
+  <div id="login-section" class="flex flex-col items-center justify-center h-screen">
+    <img src="/static/logo.png" alt="Logo Moov Authume" class="w-32 mb-6">
+    <h1 class="text-3xl font-bold mb-4">Espace Admin - Moov Authume</h1>
+    <input id="password" type="password" placeholder="Mot de passe
 
-  <div class="row">
-    <div class="card" style="flex:1">
-      <h3>Créer un adhérent</h3>
-      <input id="nom" placeholder="Nom"><br>
-      <input id="prenom" placeholder="Prénom"><br>
-      <input id="email" placeholder="Email"><br>
-      Validité (YYYY-MM-DD) : <input id="valid_until" placeholder="2025-12-31"><br>
-      <button onclick="createMember()">Créer</button>
-    </div>
-
-    <div class="card" style="flex:1">
-      <h3>Créer un événement</h3>
-      <input id="event_name" placeholder="Nom événement"><br>
-      Date (YYYY-MM-DD) : <input id="event_date" placeholder="2025-10-20"><br>
-      <button onclick="createEvent()">Créer événement</button>
-
-      <h3 style="margin-top:12px">Créer type de bon</h3>
-      <input id="voucher_name" placeholder="Nom du bon (ex: Boisson)"><br>
-      <input id="voucher_desc" placeholder="Description (optionnelle)"><br>
-      <button onclick="createVoucherType()">Créer type de bon</button>
-    </div>
-  </div>
-
-  <div style="margin-top:12px;" class="card">
-    <h3>Bénévoles</h3>
-    <input id="vol_name" placeholder="Nom bénévole">
-    <button onclick="createVolunteer()">Créer bénévole</button>
-    <div id="vol_list" class="small"></div>
-  </div>
-
-  <div style="margin-top:12px;" class="card">
-    <h3>Liste des adhérents</h3>
-    <table id="membersTable"><thead><tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Validité</th><th>QR</th><th>Actions</th></tr></thead><tbody></tbody></table>
-  </div>
-
-  <div style="margin-top:12px;" class="card">
-    <h3>Événements</h3>
-    <table id="eventsTable"><thead><tr><th>Nom</th><th>Date</th><th>Actions</th></tr></thead><tbody></tbody></table>
-  </div>
-
-  <div style="margin-top:12px;" class="card">
-    <h3>Types de bons</h3>
-    <table id="vtypesTable"><thead><tr><th>Nom</th><th>Description</th><th>Action</th></tr></thead><tbody></tbody></table>
-  </div>
-
-  <div style="margin-top:12px;" class="card">
-    <h3>Historique des scans (récentes)</h3>
-    <table id="redTable"><thead><tr><th>Nom</th><th>Événement</th><th>Type</th><th>Bénévole</th><th>Heure</th></tr></thead><tbody></tbody></table>
-  </div>
-
-</div>
-
-<script>
-async function checkAuth(){
-  const r = await fetch('/api/admin/check');
-  const j = await r.json();
-  if(!j.ok) window.location='/login.html';
-}
-checkAuth();
-
-async function logout(){ await fetch('/api/admin/logout',{method:'POST'}); window.location='/login.html'; }
-
-async function loadAll(){
-  await loadMembers();
-  await loadEvents();
-  await loadVolunteers();
-  await loadVoucherTypes();
-  await loadRedemptions();
-}
-
-async function createMember(){
-  const nom=document.getElementById('nom').value;
-  const prenom=document.getElementById('prenom').value;
-  const email=document.getElementById('email').value;
-  const valid_until=document.getElementById('valid_until').value;
-  await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,prenom,email,valid_until})});
-  loadMembers();
-}
-
-async function loadMembers(){
-  const r=await fetch('/api/members'); const data=await r.json();
-  const tbody=document.querySelector('#membersTable tbody'); tbody.innerHTML='';
-  data.forEach(m=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${m.nom}</td><td>${m.prenom}</td><td>${m.email}</td><td>${m.valid_until||'-'}</td>
-    <td class="center"><img src="/api/qrcode/${encodeURIComponent(m.token)}" style="height:60px"></td>
-    <td>
-      <button onclick="prolong('${m.id}')">Prolonger</button>
-      <button onclick="deleteMember('${m.id}')">Supprimer</button>
-    </td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteMember(id){ if(!confirm('Supprimer cet adhérent ?')) return; await fetch('/api/members/'+id,{method:'DELETE'}); loadMembers(); }
-async function prolong(id){
-  const newdate = prompt('Nouvelle date de validité (YYYY-MM-DD) :');
-  if(!newdate) return;
-  await fetch('/api/members/'+id+'/prolong',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valid_until:newdate})});
-  loadMembers();
-}
-
-async function createEvent(){ const name=document.getElementById('event_name').value; const date=document.getElementById('event_date').value; await fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,date})}); loadEvents(); }
-async function loadEvents(){ const r=await fetch('/api/events'); const data=await r.json(); const tbody=document.querySelector('#eventsTable tbody'); tbody.innerHTML=''; data.forEach(e=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${e.name}</td><td>${e.date||'-'}</td><td><button onclick="deleteEvent('${e.id}')">Supprimer</button></td>`; tbody.appendChild(tr);}); }
-async function deleteEvent(id){ if(!confirm('Supprimer événement ? (les scans liés seront supprimés)')) return; await fetch('/api/events/'+id,{method:'DELETE'}); loadEvents(); }
-
-async function createVolunteer(){ const name=document.getElementById('vol_name').value; await fetch('/api/volunteers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}); loadVolunteers(); }
-async function loadVolunteers(){ const r=await fetch('/api/volunteers'); const data=await r.json(); const el=document.getElementById('vol_list'); el.innerHTML=''; data.forEach(v=> el.innerHTML+=`<div>${v.name} <button onclick="deleteVolunteer('${v.id}')">Supprimer</button></div>`); }
-
-async function deleteVolunteer(id){ if(!confirm('Supprimer bénévole ?')) return; await fetch('/api/volunteers/'+id,{method:'DELETE'}); loadVolunteers(); }
-
-async function createVoucherType(){ const name=document.getElementById('voucher_name').value; const desc=document.getElementById('voucher_desc').value; await fetch('/api/voucher_types',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:desc})}); loadVoucherTypes(); }
-async function loadVoucherTypes(){ const r=await fetch('/api/voucher_types'); const data=await r.json(); const tbody=document.querySelector('#vtypesTable tbody'); tbody.innerHTML=''; data.forEach(v=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${v.name}</td><td>${v.description||''}</td><td><button onclick="deleteVType('${v.id}')">Supprimer</button></td>`; tbody.appendChild(tr); }); }
-async function deleteVType(id){ if(!confirm('Supprimer type de bon ?')) return; await fetch('/api/voucher_types/'+id,{method:'DELETE'}); loadVoucherTypes(); }
-
-async function loadRedemptions(){ const r=await fetch('/api/redemptions'); const data=await r.json(); const tbody=document.querySelector('#redTable tbody'); tbody.innerHTML=''; data.forEach(rp=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${rp.nom||'-'}</td><td>${rp.event||'-'}</td><td>${rp.voucher_type_id||'-'}</td><td>${rp.redeemed_by||'-'}</td><td>${rp.redeemed_at||'-'}</td>`; tbody.appendChild(tr); }); }
-
-loadAll();
-</script>
-</body>
-</html>
