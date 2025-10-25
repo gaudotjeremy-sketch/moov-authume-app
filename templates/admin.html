@@ -1,218 +1,84 @@
-<!-- templates/admin.html -->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin • Moov Authume 🔧</title>
-  <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <title>Admin — Moov Authume 👑</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <main class="container">
-    <img src="/static/logo.png" class="logo" alt="Logo">
-    <h1>Administration — Moov Authume 🎯</h1>
+    <div class="container">
+        <h1>👑 Espace Admin</h1>
+        <a href="/" class="button home">🏠 Accueil</a>
 
-    <!-- LOGIN -->
-    <section id="loginCard" class="card">
-      <h2>Connexion admin 🔐</h2>
-      <input id="adminPw" type="password" placeholder="Mot de passe admin">
-      <button id="btnLogin">Se connecter</button>
-      <p id="loginMsg" class="small"></p>
-    </section>
+        <section>
+            <h2>🧍 Adhérents</h2>
+            <form action="/add_member" method="POST" class="form-grid">
+                <input type="text" name="name" placeholder="Nom complet" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="date" name="valid_until" required>
+                <button type="submit">➕ Ajouter</button>
+            </form>
 
-    <!-- ADMIN UI -->
-    <section id="adminUI" class="hidden">
-      <div class="row">
-        <!-- Members -->
-        <div class="card" style="flex:1">
-          <h2>👥 Adhérents</h2>
-          <div class="form-row">
-            <input id="m_nom" placeholder="Nom" />
-            <input id="m_prenom" placeholder="Prénom" />
-            <input id="m_email" placeholder="Email" />
-            <label>Date de validité</label>
-            <input id="m_valid" type="date" />
-            <button onclick="createMember()">➕ Ajouter adhérent</button>
-          </div>
+            <table>
+                <tr><th>Nom</th><th>Email</th><th>Validité</th><th>QR Code</th><th>Actions</th></tr>
+                {% for m in members %}
+                <tr>
+                    <td>{{ m.name }}</td>
+                    <td>{{ m.email }}</td>
+                    <td>{{ m.valid_until }}</td>
+                    <td><img src="/qrcode/{{ m.id }}" width="80"></td>
+                    <td>
+                        <form action="/extend_member/{{ m.id }}" method="POST" style="display:inline;">
+                            <input type="date" name="valid_until" required>
+                            <button>⏩ Prolonger</button>
+                        </form>
+                        <a href="/delete_member/{{ m.id }}" class="button danger">🗑️ Supprimer</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </section>
 
-          <h3>Liste (clic pour télécharger QR)</h3>
-          <table id="membersTable">
-            <thead><tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Validité</th><th>QR</th><th>Actions</th></tr></thead>
-            <tbody></tbody>
-          </table>
-          <button onclick="exportMembers()">📥 Export CSV</button>
-        </div>
+        <section>
+            <h2>🎟️ Événements</h2>
+            <form action="/add_event" method="POST" class="form-grid">
+                <input type="text" name="event_name" placeholder="Nom de l'événement" required>
+                <input type="date" name="event_date" required>
+                <input type="number" name="drink_limit" placeholder="Nb bons boisson" required>
+                <input type="number" name="food_limit" placeholder="Nb bons repas" required>
+                <button type="submit">➕ Ajouter</button>
+            </form>
 
-        <!-- Events + vouchers -->
-        <div class="card" style="flex:1">
-          <h2>🎪 Événements & bons</h2>
-          <input id="ev_name" placeholder="Nom événement" />
-          <input id="ev_date" type="date" />
-          <button onclick="createEvent()">➕ Créer événement</button>
+            <table>
+                <tr><th>Nom</th><th>Date</th><th>Bons</th><th>Actions</th></tr>
+                {% for e in events %}
+                <tr>
+                    <td>{{ e.name }}</td>
+                    <td>{{ e.date }}</td>
+                    <td>🥤 {{ e.limits.boisson }} / 🍔 {{ e.limits.repas }}</td>
+                    <td><a href="/delete_event/{{ e.id }}" class="button danger">🗑️ Supprimer</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </section>
 
-          <h3>Ajouter type de bon (max 5 par événement)</h3>
-          <select id="ev_for_voucher"></select>
-          <input id="voucher_name" placeholder="Nom du bon (ex: Boisson)" />
-          <input id="voucher_max" type="number" min="1" value="1" />
-          <button onclick="createVoucher()">➕ Ajouter bon</button>
+        <section>
+            <h2>🤝 Bénévoles</h2>
+            <form action="/add_volunteer" method="POST" class="form-grid">
+                <input type="text" name="volunteer_name" placeholder="Nom bénévole" required>
+                <button type="submit">➕ Ajouter</button>
+            </form>
 
-          <div id="eventsList"></div>
-        </div>
-      </div>
-
-      <div class="row">
-        <!-- Volunteers -->
-        <div class="card" style="flex:1">
-          <h2>🤝 Bénévoles</h2>
-          <input id="vol_name" placeholder="Nom bénévole" />
-          <button onclick="createVolunteer()">➕ Ajouter bénévole</button>
-          <div id="volList"></div>
-        </div>
-
-        <!-- Redemptions -->
-        <div class="card" style="flex:1">
-          <h2>📝 Historique des validations</h2>
-          <table id="redTable">
-            <thead><tr><th>Nom</th><th>Événement</th><th>Bon</th><th>Bénévole</th><th>Heure</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style="text-align:right; margin-top:12px;">
-        <button onclick="logout()">🔒 Déconnexion</button>
-      </div>
-    </section>
-  </main>
-
-<script>
-const api = {
-  login: '/api/admin/login',
-  logout: '/api/admin/logout',
-  members: '/api/members',
-  qrcode: '/api/qrcode/',
-  volunteers: '/api/volunteers',
-  events: '/api/events',
-  vouchers: '/api/event_vouchers',
-  redeem: '/api/redeem',
-  redemptions: '/api/redemptions',
-  export_members: '/api/export_members'
-};
-
-document.getElementById('btnLogin').addEventListener('click', async ()=>{
-  const pw = document.getElementById('adminPw').value;
-  const res = await fetch(api.login, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})});
-  const j = await res.json();
-  if(j.success){ document.getElementById('loginCard').style.display='none'; document.getElementById('adminUI').classList.remove('hidden'); loadAll(); }
-  else { document.getElementById('loginMsg').innerText = j.error || 'Erreur'; }
-});
-
-async function logout(){ await fetch(api.logout, {method:'POST'}); location.reload(); }
-
-async function loadAll(){ await loadMembers(); await loadEvents(); await loadVolunteers(); await loadRedemptions(); }
-
-async function createMember(){
-  const nom = document.getElementById('m_nom').value.trim();
-  const prenom = document.getElementById('m_prenom').value.trim();
-  const email = document.getElementById('m_email').value.trim();
-  const valid_until = document.getElementById('m_valid').value || null;
-  if(!nom||!prenom){ alert('Nom et prénom requis'); return; }
-  await fetch(api.members, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nom,prenom,email,valid_until})});
-  document.getElementById('m_nom').value=''; document.getElementById('m_prenom').value=''; document.getElementById('m_email').value=''; document.getElementById('m_valid').value='';
-  loadMembers();
-}
-
-async function loadMembers(){
-  const r = await fetch(api.members); if(r.status!==200){ console.error('not authorized'); return; }
-  const data = await r.json(); const tbody = document.querySelector('#membersTable tbody'); tbody.innerHTML='';
-  data.forEach(m=>{
-    const tr = document.createElement('tr');
-    const tokenEsc = encodeURIComponent(m.token);
-    tr.innerHTML = `<td>${m.nom}</td><td>${m.prenom}</td><td>${m.email||''}</td><td>${m.valid_until||''}</td>
-      <td class="center"><a href="${api.qrcode+tokenEsc}" target="_blank"><img src="${api.qrcode+tokenEsc}" style="height:60px;border-radius:6px"></a></td>
-      <td>
-        <button onclick="prolongMember(${m.id})">⏳ Prolonger</button>
-        <button onclick="deleteMember(${m.id})">🗑 Supprimer</button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteMember(id){ if(!confirm('Supprimer cet adhérent ?')) return; await fetch(`/api/members/${id}`, {method:'DELETE'}); loadMembers(); }
-
-async function prolongMember(id){
-  const nd = prompt('Nouvelle date de validité (YYYY-MM-DD):');
-  if(!nd) return;
-  await fetch(`/api/members/${id}/prolong`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({valid_until: nd})});
-  loadMembers();
-}
-
-async function exportMembers(){ window.location = api.export_members; }
-
-// EVENTS & VOUCHERS
-async function createEvent(){
-  const name = document.getElementById('ev_name').value.trim();
-  const date = document.getElementById('ev_date').value || null;
-  if(!name) return alert('Nom événement requis');
-  await fetch(api.events, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, date})});
-  document.getElementById('ev_name').value=''; document.getElementById('ev_date').value='';
-  loadEvents();
-}
-
-async function loadEvents(){
-  const r = await fetch(api.events); const data = await r.json();
-  const el = document.getElementById('eventsList'); el.innerHTML=''; const sel = document.getElementById('ev_for_voucher'); sel.innerHTML='';
-  data.forEach(e=>{
-    el.innerHTML += `<div style="margin-bottom:8px;"><strong>${e.name}</strong> ${e.date? ' ('+e.date+')':''} <button onclick="deleteEvent(${e.id})">🗑</button><div id="vouchers_for_${e.id}"></div></div>`;
-    sel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
-    loadVouchers(e.id);
-  });
-}
-
-async function deleteEvent(id){ if(!confirm('Supprimer événement ?')) return; await fetch(`/api/events/${id}`, {method:'DELETE'}); loadEvents(); loadRedemptions(); }
-
-async function createVoucher(){
-  const event_id = document.getElementById('ev_for_voucher').value;
-  const name = document.getElementById('voucher_name').value.trim();
-  const max_uses = parseInt(document.getElementById('voucher_max').value || '1', 10);
-  if(!event_id || !name) return alert('Choisir événement et nom du bon');
-  await fetch(api.vouchers, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({event_id, name, max_uses})});
-  document.getElementById('voucher_name').value=''; document.getElementById('voucher_max').value='1';
-  loadEvents();
-}
-async function loadVouchers(event_id){
-  const r = await fetch(api.vouchers + '?event_id=' + event_id); const data = await r.json();
-  const div = document.getElementById(`vouchers_for_${event_id}`); if(!div) return; div.innerHTML = '<em>Types de bons :</em>';
-  data.forEach(v => { div.innerHTML += `<div>${v.name} (max ${v.max_uses}) <button onclick="deleteVoucher(${v.id}, ${event_id})">🗑</button></div>`; });
-}
-async function deleteVoucher(vid, event_id){
-  if(!confirm('Supprimer ce type de bon ?')) return;
-  await fetch(`/api/event_vouchers/${vid}`, {method:'DELETE'}); loadVouchers(event_id);
-}
-
-// VOLUNTEERS
-async function createVolunteer(){
-  const name = document.getElementById('vol_name').value.trim(); if(!name) return alert('Nom requis');
-  await fetch(api.volunteers, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
-  document.getElementById('vol_name').value=''; loadVolunteers();
-}
-async function loadVolunteers(){
-  const r = await fetch(api.volunteers); const data = await r.json(); const el = document.getElementById('volList'); el.innerHTML='';
-  data.forEach(v => { el.innerHTML += `<div>${v.name} <button onclick="deleteVolunteer(${v.id})">🗑</button></div>`; });
-}
-async function deleteVolunteer(id){ if(!confirm('Supprimer bénévole ?')) return; await fetch(`/api/volunteers/${id}`, {method:'DELETE'}); loadVolunteers(); }
-
-// REDEMPTIONS (history)
-async function loadRedemptions(){
-  const r = await fetch(api.redemptions); const data = await r.json();
-  const tbody = document.querySelector('#redTable tbody'); tbody.innerHTML='';
-  data.forEach(rp => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${rp.nom||''} ${rp.prenom||''}</td><td>${rp.event||''}</td><td>${rp.voucher||''}</td><td>${rp.redeemed_by||''}</td><td>${rp.redeemed_at||''}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-</script>
+            <table>
+                <tr><th>Nom</th><th>Actions</th></tr>
+                {% for v in volunteers %}
+                <tr>
+                    <td>{{ v.name }}</td>
+                    <td><a href="/delete_volunteer/{{ v.id }}" class="button danger">🗑️ Supprimer</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </section>
+    </div>
 </body>
 </html>
-
