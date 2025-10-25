@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Moov Authume</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="center">
+    <img src="/static/logo.png" alt="Logo Moov Authume" class="logo">
+    <h1>Bienvenue sur Moov Authume</h1>
+    <div class="buttons">
+      <a href="/admin" class="btn">Espace Admin</a>
+      <a href="/scan" class="btn">Espace Bénévole</a>
+    </div>
+  </div>
+</body>
+</html>
