@@ -2,83 +2,77 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Admin — Moov Authume 👑</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Espace Admin 🧠</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>👑 Espace Admin</h1>
-        <a href="/" class="button home">🏠 Accueil</a>
+    <header>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        Admin Moov Authume 🧠
+    </header>
 
-        <section>
-            <h2>🧍 Adhérents</h2>
-            <form action="/add_member" method="POST" class="form-grid">
-                <input type="text" name="name" placeholder="Nom complet" required>
-                <input type="email" name="email" placeholder="Email" required>
-                <input type="date" name="valid_until" required>
-                <button type="submit">➕ Ajouter</button>
+    <h2>👤 Gestion des Adhérents</h2>
+    <form method="POST" action="/add_member">
+        <input name="nom" placeholder="Nom" required>
+        <input name="prenom" placeholder="Prénom" required>
+        <input name="email" type="email" placeholder="Email" required>
+        <label>Validité jusqu'au :</label>
+        <input name="valid_until" type="date" required>
+        <button type="submit">➕ Ajouter</button>
+    </form>
+
+    {% for m in members %}
+        <div class="card">
+            <p><b>{{ m[1] }} {{ m[2] }}</b></p>
+            <p>{{ m[3] }}</p>
+            <p>Validité : {{ m[4] }}</p>
+            <img src="/static/qrcodes/{{ m[5] }}.png" class="qr-img">
+            <form method="POST" action="/delete_member">
+                <input type="hidden" name="id" value="{{ m[0] }}">
+                <button type="submit">🗑️ Supprimer</button>
             </form>
+        </div>
+    {% endfor %}
 
-            <table>
-                <tr><th>Nom</th><th>Email</th><th>Validité</th><th>QR Code</th><th>Actions</th></tr>
-                {% for m in members %}
-                <tr>
-                    <td>{{ m.name }}</td>
-                    <td>{{ m.email }}</td>
-                    <td>{{ m.valid_until }}</td>
-                    <td><img src="/qrcode/{{ m.id }}" width="80"></td>
-                    <td>
-                        <form action="/extend_member/{{ m.id }}" method="POST" style="display:inline;">
-                            <input type="date" name="valid_until" required>
-                            <button>⏩ Prolonger</button>
-                        </form>
-                        <a href="/delete_member/{{ m.id }}" class="button danger">🗑️ Supprimer</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-        </section>
+    <hr>
 
-        <section>
-            <h2>🎟️ Événements</h2>
-            <form action="/add_event" method="POST" class="form-grid">
-                <input type="text" name="event_name" placeholder="Nom de l'événement" required>
-                <input type="date" name="event_date" required>
-                <input type="number" name="drink_limit" placeholder="Nb bons boisson" required>
-                <input type="number" name="food_limit" placeholder="Nb bons repas" required>
-                <button type="submit">➕ Ajouter</button>
+    <h2>🙋 Gestion des Bénévoles</h2>
+    <form method="POST" action="/add_volunteer">
+        <input name="nom" placeholder="Nom du bénévole" required>
+        <button type="submit">➕ Ajouter</button>
+    </form>
+
+    {% for v in volunteers %}
+        <div class="card">
+            <p>{{ v[1] }}</p>
+            <form method="POST" action="/delete_volunteer">
+                <input type="hidden" name="id" value="{{ v[0] }}">
+                <button type="submit">🗑️ Supprimer</button>
             </form>
+        </div>
+    {% endfor %}
 
-            <table>
-                <tr><th>Nom</th><th>Date</th><th>Bons</th><th>Actions</th></tr>
-                {% for e in events %}
-                <tr>
-                    <td>{{ e.name }}</td>
-                    <td>{{ e.date }}</td>
-                    <td>🥤 {{ e.limits.boisson }} / 🍔 {{ e.limits.repas }}</td>
-                    <td><a href="/delete_event/{{ e.id }}" class="button danger">🗑️ Supprimer</a></td>
-                </tr>
-                {% endfor %}
-            </table>
-        </section>
+    <hr>
 
-        <section>
-            <h2>🤝 Bénévoles</h2>
-            <form action="/add_volunteer" method="POST" class="form-grid">
-                <input type="text" name="volunteer_name" placeholder="Nom bénévole" required>
-                <button type="submit">➕ Ajouter</button>
-            </form>
+    <h2>🎟️ Gestion des Événements</h2>
+    <form method="POST" action="/add_event">
+        <input name="nom" placeholder="Nom de l'événement" required>
+        <input type="date" name="date" required>
+        <input type="number" name="bons_boisson" placeholder="Bons boisson" value="1" min="0">
+        <input type="number" name="bons_repas" placeholder="Bons repas" value="0" min="0">
+        <input type="number" name="bons_autre" placeholder="Bons autre" value="0" min="0">
+        <button type="submit">📅 Ajouter</button>
+    </form>
 
-            <table>
-                <tr><th>Nom</th><th>Actions</th></tr>
-                {% for v in volunteers %}
-                <tr>
-                    <td>{{ v.name }}</td>
-                    <td><a href="/delete_volunteer/{{ v.id }}" class="button danger">🗑️ Supprimer</a></td>
-                </tr>
-                {% endfor %}
-            </table>
-        </section>
-    </div>
+    {% for e in events %}
+        <div class="card">
+            <p><b>{{ e[1] }}</b> ({{ e[2] }})</p>
+            <p>🥤 Bons boisson : {{ e[3] }}</p>
+            <p>🍔 Bons repas : {{ e[4] }}</p>
+            <p>🎁 Bons autre : {{ e[5] }}</p>
+        </div>
+    {% endfor %}
+
+    <footer>© 2025 Moov Authume 💙</footer>
 </body>
 </html>
