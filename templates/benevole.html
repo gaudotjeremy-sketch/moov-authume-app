@@ -12,6 +12,12 @@
         Espace Bénévole 👷
     </header>
 
+    <div style="margin-top:10px;">
+        <a href="/"><button>🏠 Accueil</button></a>
+        <a href="/benevole"><button style="background:#0288d1;">🎯 Scanner</button></a>
+        <a href="/admin"><button>⚙️ Espace Admin</button></a>
+    </div>
+
     <h2>Scanner un QR Code 🎯</h2>
     <select id="event">
         {% for e in events %}
@@ -31,7 +37,7 @@
         <option value="autre">🎁 Autre</option>
     </select>
 
-    <div id="reader" style="width:300px; margin:auto;"></div>
+    <div id="reader" style="width:300px; margin:auto; margin-top:20px;"></div>
     <p id="result"></p>
 
     <script>
