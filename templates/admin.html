@@ -1,15 +1,156 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Espace Admin - Moov Authume</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <title>Admin – Moov Authume</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    async function checkPassword() {
+      const pass = prompt("Mot de passe admin :");
+      const res = await fetch("/get-admin-password");
+      const data = await res.json();
+      if (pass !== data.password) {
+        alert("Mot de passe incorrect !");
+        window.location.href = "/";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", checkPassword);
+
+    async function addMember() {
+      const name = document.getElementById("member_name").value;
+      const email = document.getElementById("member_email").value;
+      const res = await fetch("/add_member", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name, email})
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        alert("Adhérent ajouté !");
+        location.reload();
+      }
+    }
+
+    async function deleteMember(name) {
+      if (confirm(`Supprimer ${name} ?`)) {
+        await fetch("/delete_member", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name})
+        });
+        location.reload();
+      }
+    }
+
+    async function extendMember(name) {
+      await fetch("/extend_member", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name})
+      });
+      alert("Date de validité prolongée d’un an !");
+      location.reload();
+    }
+
+    async function addVolunteer() {
+      const name = document.getElementById("volunteer_name").value;
+      await fetch("/add_volunteer", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name})
+      });
+      alert("Bénévole ajouté !");
+      location.reload();
+    }
+
+    async function deleteVolunteer(name) {
+      if (confirm(`Supprimer ${name} ?`)) {
+        await fetch("/delete_volunteer", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name})
+        });
+        location.reload();
+      }
+    }
+
+    async function addEvent() {
+      const name = document.getElementById("event_name").value;
+      await fetch("/add_event", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name})
+      });
+      alert("Événement ajouté !");
+      location.reload();
+    }
+
+    async function deleteEvent(name) {
+      if (confirm(`Supprimer ${name} ?`)) {
+        await fetch("/delete_event", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name})
+        });
+        location.reload();
+      }
+    }
+  </script>
 </head>
-<body class="bg-gray-100 text-gray-900">
+<body>
+  <div class="container">
+    <h1>🛠️ Panneau d’administration – Moov Authume</h1>
 
-  <div id="login-section" class="flex flex-col items-center justify-center h-screen">
-    <img src="/static/logo.png" alt="Logo Moov Authume" class="w-32 mb-6">
-    <h1 class="text-3xl font-bold mb-4">Espace Admin - Moov Authume</h1>
-    <input id="password" type="password" placeholder="Mot de passe
+    <!-- Gestion des adhérents -->
+    <section>
+      <h2>👤 Adhérents</h2>
+      <input id="member_name" placeholder="Nom complet">
+      <input id="member_email" placeholder="Email">
+      <button onclick="addMember()">Ajouter</button>
+      <a href="/export_members" class="btn">📥 Export CSV</a>
 
+      <table>
+        <tr><th>Nom</th><th>Email</th><th>Expiration</th><th>Actions</th></tr>
+        {% for m in members %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>{{ m.email }}</td>
+          <td>{{ m.expiration }}</td>
+          <td>
+            <button onclick="extendMember('{{ m.name }}')">Prolonger</button>
+            <button onclick="deleteMember('{{ m.name }}')">Supprimer</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </section>
+
+    <!-- Gestion des bénévoles -->
+    <section>
+      <h2>🤝 Bénévoles</h2>
+      <input id="volunteer_name" placeholder="Nom du bénévole">
+      <button onclick="addVolunteer()">Ajouter</button>
+      <ul>
+        {% for v in volunteers %}
+          <li>{{ v }} <button onclick="deleteVolunteer('{{ v }}')">Supprimer</button></li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <!-- Gestion des événements -->
+    <section>
+      <h2>🎉 Événements</h2>
+      <input id="event_name" placeholder="Nom de l’événement">
+      <button onclick="addEvent()">Ajouter</button>
+      <ul>
+        {% for e in events %}
+          <li>{{ e }} <button onclick="deleteEvent('{{ e }}')">Supprimer</button></li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <p><a href="/" class="btn">⬅ Retour à l’accueil</a></p>
+  </div>
+</body>
+</html>
