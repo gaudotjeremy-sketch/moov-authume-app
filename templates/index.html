@@ -2,15 +2,25 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Moov Authume 🎉</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Moov Authume 💃</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <img src="/static/logo.png" class="logo" alt="Moov Authume Logo">
-        <h1>Bienvenue sur Moov Authume ! 💃</h1>
-        <a href="/admin" class="button admin">👑 Accès Admin</a>
-        <a href="/scan" class="button volunteer">🤝 Accès Bénévole</a>
-    </div>
+    <header>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        Moov Authume 💃
+    </header>
+
+    <h2>Bienvenue sur la plateforme 🎉</h2>
+    <p>Choisissez votre espace :</p>
+
+    <a href="/benevole"><button>👷 Espace Bénévole</button></a>
+    <form method="POST" action="/admin">
+        <input type="password" name="password" placeholder="Mot de passe admin 🔐" required>
+        <button type="submit">🔑 Espace Admin</button>
+        {% if error %}
+            <p style="color:red;">{{ error }}</p>
+        {% endif %}
+    </form>
 </body>
 </html>
