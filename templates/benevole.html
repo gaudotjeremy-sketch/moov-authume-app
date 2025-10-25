@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Espace Bénévole 👷</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+    <header>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        Espace Bénévole 👷
+    </header>
+
+    <h2>Scanner un QR Code 🎯</h2>
+    <select id="event">
+        {% for e in events %}
+            <option value="{{ e[0] }}">{{ e[1] }} ({{ e[2] }})</option>
+        {% endfor %}
+    </select>
+
+    <select id="volunteer">
+        {% for v in volunteers %}
+            <option value="{{ v[1] }}">{{ v[1] }}</option>
+        {% endfor %}
+    </select>
+
+    <select id="bon_type">
+        <option value="boisson">🥤 Boisson</option>
+        <option value="repas">🍔 Repas</option>
+        <option value="autre">🎁 Autre</option>
+    </select>
+
+    <div id="reader" style="width:300px; margin:auto;"></div>
+    <p id="result"></p>
+
+    <script>
+        const resultDiv = document.getElementById("result");
+        const html5QrCode = new Html5Qrcode("reader");
+
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
+            qrCodeMessage => {
+                fetch("/scan", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        qr: qrCodeMessage,
+                        event_id: document.getElementById("event").value,
+                        volunteer: document.getElementById("volunteer").value,
+                        bon_type: document.getElementById("bon_type").value
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    resultDiv.innerText = data.message;
+                    resultDiv.style.color = data.status === "ok" ? "green" : "red";
+                });
+            },
+            err => {}
+        );
+    </script>
+</body>
+</html>
