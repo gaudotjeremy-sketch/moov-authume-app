@@ -2,84 +2,235 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Espace Admin 🧠</title>
+    <title>👑 Espace Administrateur - Moov Authume</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f7f9fc;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h2, h3 {
+            color: #222;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        nav {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        nav a {
+            background: #007bff;
+            color: white;
+            padding: 10px 18px;
+            margin: 0 5px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        nav a:hover {
+            background: #0056b3;
+        }
+
+        section {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            border: 1px solid #eee;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background: #f1f1f1;
+        }
+
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        input, select {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-right: 5px;
+        }
+
+        img {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 4px;
+            background: #fff;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background: #b02a37;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
-        Admin Moov Authume 🧠
-    </header>
+    <h1>👑 Panneau d’administration - <strong>Moov Authume</strong></h1>
 
-    <div style="margin-top:10px;">
-        <a href="/"><button>🏠 Accueil</button></a>
-        <a href="/benevole"><button>👷 Espace Bénévole</button></a>
-        <a href="/admin"><button style="background:#0288d1;">⚙️ Espace Admin</button></a>
-    </div>
-
-    <h2>👤 Gestion des Adhérents</h2>
-    <form method="POST" action="/add_member">
-        <input name="nom" placeholder="Nom" required>
-        <input name="prenom" placeholder="Prénom" required>
-        <input name="email" type="email" placeholder="Email" required>
-        <label>Validité jusqu'au :</label>
-        <input name="valid_until" type="date" required>
-        <button type="submit">➕ Ajouter</button>
+    <form action="{{ url_for('logout') }}" method="post" style="text-align:right;">
+        <button class="delete-btn" type="submit">🚪 Déconnexion</button>
     </form>
 
-    {% for m in members %}
-        <div class="card">
-            <p><b>{{ m[1] }} {{ m[2] }}</b></p>
-            <p>{{ m[3] }}</p>
-            <p>Validité : {{ m[4] }}</p>
-            <img src="{{ url_for('static', filename='qrcodes/' + member.qr_code) }}" width="100">
-            <form method="POST" action="/delete_member">
-                <input type="hidden" name="id" value="{{ m[0] }}">
-                <button type="submit">🗑️ Supprimer</button>
-            </form>
-        </div>
-    {% endfor %}
+    <nav>
+        <a href="/">🏠 Accueil</a>
+        <a href="{{ url_for('benevole') }}">🤝 Espace Bénévole</a>
+        <a href="{{ url_for('admin') }}">⚙️ Actualiser</a>
+    </nav>
 
-    <hr>
+    <!-- AJOUT D'ADHERENT -->
+    <section>
+        <h2>🆕 Ajouter un adhérent</h2>
+        <form action="{{ url_for('add_member') }}" method="post">
+            <input type="text" name="nom" placeholder="👤 Nom" required>
+            <input type="text" name="prenom" placeholder="🧍 Prénom" required>
+            <input type="email" name="email" placeholder="📧 Email" required>
+            <input type="date" name="valid_until" required>
+            <button type="submit">✅ Ajouter</button>
+        </form>
+    </section>
 
-    <h2>🙋 Gestion des Bénévoles</h2>
-    <form method="POST" action="/add_volunteer">
-        <input name="nom" placeholder="Nom du bénévole" required>
-        <button type="submit">➕ Ajouter</button>
-    </form>
+    <!-- LISTE DES ADHERENTS -->
+    <section>
+        <h2>📋 Liste des adhérents</h2>
+        {% if members %}
+        <table>
+            <tr>
+                <th>👤 Nom</th>
+                <th>🧍 Prénom</th>
+                <th>📧 Email</th>
+                <th>📅 Validité</th>
+                <th>🔗 QR Code</th>
+                <th>🗑️ Supprimer</th>
+            </tr>
+            {% for member in members %}
+            <tr>
+                <td>{{ member[1] }}</td>
+                <td>{{ member[2] }}</td>
+                <td>{{ member[3] }}</td>
+                <td>{{ member[4] }}</td>
+                <td>
+                    <img src="{{ url_for('static', filename='qrcodes/' + member[5]) }}" width="90" alt="QR">
+                </td>
+                <td>
+                    <form action="{{ url_for('delete_member') }}" method="post">
+                        <input type="hidden" name="id" value="{{ member[0] }}">
+                        <button class="delete-btn" type="submit">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+            <p>Aucun adhérent enregistré pour le moment 💤</p>
+        {% endif %}
+    </section>
 
-    {% for v in volunteers %}
-        <div class="card">
-            <p>{{ v[1] }}</p>
-            <form method="POST" action="/delete_volunteer">
-                <input type="hidden" name="id" value="{{ v[0] }}">
-                <button type="submit">🗑️ Supprimer</button>
-            </form>
-        </div>
-    {% endfor %}
+    <!-- BENEVOLES -->
+    <section>
+        <h2>🙌 Gestion des bénévoles</h2>
+        <form action="{{ url_for('add_volunteer') }}" method="post">
+            <input type="text" name="nom" placeholder="✍️ Nom du bénévole" required>
+            <button type="submit">➕ Ajouter</button>
+        </form>
 
-    <hr>
+        <h3>📜 Liste des bénévoles</h3>
+        <ul>
+            {% for volunteer in volunteers %}
+                <li>🤝 {{ volunteer[1] }}
+                    <form action="{{ url_for('delete_volunteer') }}" method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="{{ volunteer[0] }}">
+                        <button class="delete-btn" type="submit">🗑️</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
 
-    <h2>🎟️ Gestion des Événements</h2>
-    <form method="POST" action="/add_event">
-        <input name="nom" placeholder="Nom de l'événement" required>
-        <input type="date" name="date" required>
-        <input type="number" name="bons_boisson" placeholder="Bons boisson" value="1" min="0">
-        <input type="number" name="bons_repas" placeholder="Bons repas" value="0" min="0">
-        <input type="number" name="bons_autre" placeholder="Bons autre" value="0" min="0">
-        <button type="submit">📅 Ajouter</button>
-    </form>
+    <!-- EVENEMENTS -->
+    <section>
+        <h2>🎉 Créer un événement</h2>
+        <form action="{{ url_for('add_event') }}" method="post">
+            <input type="text" name="nom" placeholder="🎊 Nom de l'événement" required>
+            <input type="date" name="date" required>
+            <input type="number" name="bons_boisson" placeholder="🍹 Bons boisson" min="0">
+            <input type="number" name="bons_repas" placeholder="🍽️ Bons repas" min="0">
+            <input type="number" name="bons_autre" placeholder="🎟️ Autres bons" min="0">
+            <button type="submit">🚀 Créer</button>
+        </form>
 
-    {% for e in events %}
-        <div class="card">
-            <p><b>{{ e[1] }}</b> ({{ e[2] }})</p>
-            <p>🥤 Bons boisson : {{ e[3] }}</p>
-            <p>🍔 Bons repas : {{ e[4] }}</p>
-            <p>🎁 Bons autre : {{ e[5] }}</p>
-        </div>
-    {% endfor %}
+        <h3>📅 Liste des événements</h3>
+        {% if events %}
+        <table>
+            <tr>
+                <th>🎊 Nom</th>
+                <th>📅 Date</th>
+                <th>🍹 Boisson</th>
+                <th>🍽️ Repas</th>
+                <th>🎟️ Autres</th>
+            </tr>
+            {% for event in events %}
+            <tr>
+                <td>{{ event[1] }}</td>
+                <td>{{ event[2] }}</td>
+                <td>{{ event[3] }}</td>
+                <td>{{ event[4] }}</td>
+                <td>{{ event[5] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+            <p>Aucun événement pour le moment 🎈</p>
+        {% endif %}
+    </section>
 
-    <footer>© 2025 Moov Authume 💙</footer>
+    <footer>
+        <p>🌍 Moov Authume — Interface Admin v2.5 | Développée avec ❤️</p>
+    </footer>
 </body>
 </html>
 
