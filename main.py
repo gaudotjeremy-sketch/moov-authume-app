@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import qrcode
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 from datetime import datetime
 from io import BytesIO
 from werkzeug.utils import secure_filename
@@ -12,7 +12,7 @@ app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "moov2025")
 DATABASE = "database.db"
 
-# --- Database initialization ---
+# --- Database init ---
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
         c = conn.cursor()
@@ -48,6 +48,11 @@ def init_db():
 init_db()
 
 # --- Helper functions ---
+def generate_qr_code(data, filename):
+    os.makedirs("static/qrcodes", exist_ok=True)
+    img = qrcode.make(data)
+    img.save(filename)
+
 def get_member_by_qr(qr_code):
     with sqlite3.connect(DATABASE) as conn:
         c = conn.cursor()
@@ -60,12 +65,12 @@ def get_member_by_qr(qr_code):
 def index():
     return render_template("index.html")
 
-# --- ADMIN PROTÉGÉ ---
+# --- Admin login & dashboard ---
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if "logged_in" not in session:
         if request.method == "POST":
-            if request.form["password"] == ADMIN_PASSWORD:
+            if request.form.get("password") == ADMIN_PASSWORD:
                 session["logged_in"] = True
             else:
                 return render_template("index.html", error="Mot de passe incorrect ⚠️")
@@ -83,12 +88,13 @@ def admin():
 
     return render_template("admin.html", members=members, volunteers=volunteers, events=events)
 
+# --- Logout ---
 @app.route("/logout", methods=["POST"])
 def logout():
-    session.pop("logged_in", None)
+    session.clear()
     return redirect(url_for("index"))
 
-# --- AJOUT D'ADHÉRENT ---
+# --- Ajouter un adhérent ---
 @app.route("/add_member", methods=["POST"])
 def add_member():
     nom = request.form["nom"]
@@ -97,26 +103,20 @@ def add_member():
     valid_until = request.form["valid_until"]
 
     qr_code_data = f"{nom}-{prenom}-{email}"
-    qr_dir = "static/qrcodes"
-    os.makedirs(qr_dir, exist_ok=True)
-    qr_code_filename = f"{secure_filename(qr_code_data)}.png"
-    qr_code_path = os.path.join(qr_dir, qr_code_filename)
+    qr_filename = f"static/qrcodes/{secure_filename(qr_code_data)}.png"
 
-    if not os.path.exists(qr_code_path):
-        img = qrcode.make(qr_code_data)
-        img.save(qr_code_path)
+    if not os.path.exists(qr_filename):
+        generate_qr_code(qr_code_data, qr_filename)
 
     with sqlite3.connect(DATABASE) as conn:
         c = conn.cursor()
-        c.execute(
-            "INSERT INTO members (nom, prenom, email, valid_until, qr_code) VALUES (?, ?, ?, ?, ?)",
-            (nom, prenom, email, valid_until, qr_code_filename),
-        )
+        c.execute("INSERT INTO members (nom, prenom, email, valid_until, qr_code) VALUES (?, ?, ?, ?, ?)",
+                  (nom, prenom, email, valid_until, f"{secure_filename(qr_code_data)}.png"))
         conn.commit()
 
     return redirect(url_for("admin"))
 
-# --- SUPPRESSION ADHÉRENT ---
+# --- Supprimer un adhérent ---
 @app.route("/delete_member", methods=["POST"])
 def delete_member():
     member_id = request.form["id"]
@@ -126,7 +126,7 @@ def delete_member():
         conn.commit()
     return redirect(url_for("admin"))
 
-# --- AJOUT BÉNÉVOLE ---
+# --- Ajouter un bénévole ---
 @app.route("/add_volunteer", methods=["POST"])
 def add_volunteer():
     nom = request.form["nom"]
@@ -136,6 +136,7 @@ def add_volunteer():
         conn.commit()
     return redirect(url_for("admin"))
 
+# --- Supprimer un bénévole ---
 @app.route("/delete_volunteer", methods=["POST"])
 def delete_volunteer():
     volunteer_id = request.form["id"]
@@ -145,7 +146,7 @@ def delete_volunteer():
         conn.commit()
     return redirect(url_for("admin"))
 
-# --- AJOUT ÉVÉNEMENT ---
+# --- Créer un événement ---
 @app.route("/add_event", methods=["POST"])
 def add_event():
     nom = request.form["nom"]
@@ -153,6 +154,7 @@ def add_event():
     bons_boisson = int(request.form.get("bons_boisson", 0))
     bons_repas = int(request.form.get("bons_repas", 0))
     bons_autre = int(request.form.get("bons_autre", 0))
+
     with sqlite3.connect(DATABASE) as conn:
         c = conn.cursor()
         c.execute("""INSERT INTO events (nom, date, bons_boisson, bons_repas, bons_autre)
@@ -161,7 +163,7 @@ def add_event():
         conn.commit()
     return redirect(url_for("admin"))
 
-# --- ESPACE BÉNÉVOLE ---
+# --- Espace bénévole ---
 @app.route("/benevole")
 def benevole():
     with sqlite3.connect(DATABASE) as conn:
@@ -172,7 +174,7 @@ def benevole():
         volunteers = c.fetchall()
     return render_template("benevole.html", events=events, volunteers=volunteers)
 
-# --- SCAN ---
+# --- Scanner QR code ---
 @app.route("/scan", methods=["POST"])
 def scan():
     data = request.json
@@ -216,3 +218,4 @@ def scan():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
