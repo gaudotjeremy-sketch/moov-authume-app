@@ -32,7 +32,7 @@
             <p><b>{{ m[1] }} {{ m[2] }}</b></p>
             <p>{{ m[3] }}</p>
             <p>Validité : {{ m[4] }}</p>
-            <img src="/static/qrcodes/{{ m[5] }}.png" class="qr-img">
+            <img src="{{ url_for('static', filename='qrcodes/' + member.qr_code) }}" width="100">
             <form method="POST" action="/delete_member">
                 <input type="hidden" name="id" value="{{ m[0] }}">
                 <button type="submit">🗑️ Supprimer</button>
