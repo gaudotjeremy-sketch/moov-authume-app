@@ -1,124 +1,247 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin – Moov Authume</title>
-  <link rel="stylesheet" href="/static/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Moov Authume</title>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Espace Administrateur – Moov Authume</h1>
+<main class="container">
+  <img src="/static/logo.png" class="logo" alt="Logo">
+  <h1>Administration — Moov Authume</h1>
 
-    <h2>👤 Ajouter un adhérent</h2>
-    <input id="name" placeholder="Nom complet">
-    <input id="email" placeholder="Email">
-    <label>Date de validité :</label>
-    <input id="expiration" type="date">
-    <button onclick="addMember()">Ajouter</button>
+  <!-- Login -->
+  <section id="loginSection" class="card">
+    <h2>Connexion admin</h2>
+    <input id="adminPassword" type="password" placeholder="Mot de passe">
+    <button id="btnLogin">Se connecter</button>
+    <p id="loginMsg" class="small"></p>
+  </section>
 
-    <div id="qr-result"></div>
+  <!-- Admin UI (hidden until login) -->
+  <section id="adminUI" class="hidden">
 
-    <h2>📋 Liste des adhérents</h2>
-    <table>
-      <tr><th>Nom</th><th>Email</th><th>Expiration</th><th>Actions</th></tr>
-      {% for m in members %}
-        <tr>
-          <td>{{ m.name }}</td>
-          <td>{{ m.email }}</td>
-          <td>{{ m.expiration }}</td>
-          <td>
-            <button onclick="deleteMember('{{m.name}}')">🗑 Supprimer</button>
-          </td>
-        </tr>
-      {% endfor %}
-    </table>
+    <div class="row">
+      <div class="card" style="flex:1">
+        <h3>Ajouter adhérent</h3>
+        <input id="m_nom" placeholder="Nom">
+        <input id="m_prenom" placeholder="Prénom">
+        <input id="m_email" placeholder="Email">
+        <label>Date validité</label>
+        <input id="m_valid" type="date">
+        <button onclick="createMember()">Créer adhérent</button>
+        <div id="qrPreview"></div>
+      </div>
 
-    <h2>🎪 Gestion des événements</h2>
-    <input id="eventName" placeholder="Nom de l’événement">
-    <button onclick="addEvent()">Ajouter</button>
-    <ul id="event-list">
-      {% for e in events %}
-        <li>{{ e }} <button onclick="deleteEvent('{{e}}')">🗑</button></li>
-      {% endfor %}
-    </ul>
+      <div class="card" style="flex:1">
+        <h3>Événements & bons</h3>
+        <input id="ev_name" placeholder="Nom événement">
+        <input id="ev_date" type="date">
+        <button onclick="createEvent()">Créer événement</button>
 
-    <h2>🙋‍♂️ Gestion des bénévoles</h2>
-    <input id="volName" placeholder="Nom du bénévole">
-    <button onclick="addVolunteer()">Ajouter</button>
-    <ul id="vol-list">
-      {% for v in volunteers %}
-        <li>{{ v }} <button onclick="deleteVolunteer('{{v}}')">🗑</button></li>
-      {% endfor %}
-    </ul>
+        <h4>Ajouter type de bon pour un événement</h4>
+        <select id="ev_select_for_voucher"></select>
+        <input id="voucher_name" placeholder="Nom du bon (ex: Boisson)">
+        <input id="voucher_max" type="number" min="1" value="1">
+        <button onclick="createVoucher()">Ajouter type de bon</button>
 
-    <p><a href="/" class="btn">⬅ Retour à l’accueil</a></p>
-  </div>
+        <div id="eventList"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <div class="card" style="flex:1">
+        <h3>Bénévoles</h3>
+        <input id="vol_name" placeholder="Nom bénévole">
+        <button onclick="createVolunteer()">Ajouter bénévole</button>
+        <div id="volList"></div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <h3>Adhérents (liste)</h3>
+        <button onclick="loadMembers()">Rafraîchir</button>
+        <button onclick="exportMembers()">Exporter CSV</button>
+        <table id="membersTable">
+          <thead><tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Validité</th><th>QR</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Historique des validations (récentes)</h3>
+      <table id="redTable">
+        <thead><tr><th>Nom</th><th>Événement</th><th>Bon</th><th>Bénévole</th><th>Heure</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div style="text-align:right;margin-top:12px;">
+      <button onclick="logout()">Se déconnecter</button>
+    </div>
+  </section>
+</main>
 
 <script>
-function addMember() {
-  const name = document.getElementById("name").value;
-  const email = document.getElementById("email").value;
-  const expiration = document.getElementById("expiration").value;
+const api = {
+  login: '/api/admin/login',
+  members: '/api/members',
+  create_member: '/api/members',
+  delete_member: (id) => `/api/members/${id}`,
+  prolong_member: (id) => `/api/members/${id}/prolong`,
+  volunteers: '/api/volunteers',
+  events: '/api/events',
+  vouchers: '/api/event_vouchers',
+  redeem: '/api/redeem',
+  redemptions: '/api/redemptions',
+  export_members: '/api/export_members'
+};
 
-  fetch("/add_member", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name, email, expiration})
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.status === "ok") {
-      document.getElementById("qr-result").innerHTML = `
-        <h3>QR Code généré :</h3>
-        <img src="data:image/png;base64,${data.qr}" style="width:200px">
-      `;
-      setTimeout(() => location.reload(), 1500);
-    }
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const pw = document.getElementById('adminPassword').value;
+  const r = await fetch(api.login, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})});
+  if(r.status===200){
+    const j = await r.json();
+    if(j.success){ document.getElementById('loginSection').style.display='none'; document.getElementById('adminUI').classList.remove('hidden'); loadAll(); }
+    else { document.getElementById('loginMsg').innerText = j.error || 'Erreur'; }
+  } else { document.getElementById('loginMsg').innerText = 'Erreur connexion'; }
+});
+
+function logout(){ fetch('/api/admin/logout', {method:'POST'}); location.reload(); }
+
+async function loadAll(){
+  await loadMembers(); await loadEvents(); await loadVolunteers(); await loadRedemptions();
+}
+
+async function createMember(){
+  const nom=document.getElementById('m_nom').value.trim();
+  const prenom=document.getElementById('m_prenom').value.trim();
+  const email=document.getElementById('m_email').value.trim();
+  const valid=document.getElementById('m_valid').value || null;
+  if(!nom||!prenom){ alert('Nom et prénom requis'); return; }
+  await fetch('/api/members', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nom,prenom,email,valid_until:valid})});
+  document.getElementById('m_nom').value=''; document.getElementById('m_prenom').value=''; document.getElementById('m_email').value=''; document.getElementById('m_valid').value='';
+  loadMembers();
+}
+
+async function loadMembers(){
+  const r = await fetch('/api/members'); if(r.status!==200) { console.error('not authorized'); return; }
+  const data = await r.json();
+  const tbody = document.querySelector('#membersTable tbody'); tbody.innerHTML='';
+  data.forEach(m=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${m.nom}</td><td>${m.prenom}</td><td>${m.email||''}</td><td>${m.valid_until||''}</td>
+      <td class="center"><img src="/api/qrcode/${encodeURIComponent(m.token)}" style="height:60px"></td>
+      <td>
+        <button onclick="prolongMember(${m.id})">Prolonger</button>
+        <button onclick="deleteMember(${m.id})">Supprimer</button>
+      </td>`;
+    tbody.appendChild(tr);
   });
 }
 
-function deleteMember(name) {
-  fetch("/delete_member", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name})
-  }).then(() => location.reload());
+async function deleteMember(id){
+  if(!confirm('Supprimer cet adhérent ?')) return;
+  await fetch(`/api/members/${id}`, {method:'DELETE'});
+  loadMembers();
 }
 
-function addEvent() {
-  const name = document.getElementById("eventName").value;
-  fetch("/add_event", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name})
-  }).then(() => location.reload());
+async function prolongMember(id){
+  const nd = prompt('Nouvelle date de validité (YYYY-MM-DD) :');
+  if(!nd) return;
+  await fetch(`/api/members/${id}/prolong`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({valid_until: nd})});
+  loadMembers();
 }
 
-function deleteEvent(name) {
-  fetch("/delete_event", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name})
-  }).then(() => location.reload());
+// Volunteers
+async function createVolunteer(){
+  const name = document.getElementById('vol_name').value.trim();
+  if(!name) return alert('Nom requis');
+  await fetch('/api/volunteers', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  document.getElementById('vol_name').value=''; loadVolunteers();
+}
+async function loadVolunteers(){
+  const r = await fetch('/api/volunteers'); const data = await r.json();
+  const el = document.getElementById('volList'); el.innerHTML='';
+  data.forEach(v => {
+    el.innerHTML += `<div>${v.name} <button onclick="deleteVolunteer(${v.id})">Suppr</button></div>`;
+  });
+}
+async function deleteVolunteer(id){
+  if(!confirm('Supprimer bénévole ?')) return;
+  await fetch(`/api/volunteers/${id}`, {method:'DELETE'});
+  loadVolunteers();
 }
 
-function addVolunteer() {
-  const name = document.getElementById("volName").value;
-  fetch("/add_volunteer", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name})
-  }).then(() => location.reload());
+// Events & vouchers
+async function createEvent(){
+  const name = document.getElementById('ev_name').value.trim();
+  const date = document.getElementById('ev_date').value || null;
+  if(!name) return alert('Nom requis');
+  await fetch('/api/events', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,date})});
+  document.getElementById('ev_name').value=''; document.getElementById('ev_date').value='';
+  loadEvents();
+}
+async function loadEvents(){
+  const r = await fetch('/api/events'); const data = await r.json();
+  const el = document.getElementById('eventList'); el.innerHTML=''; const sel = document.getElementById('ev_select_for_voucher'); sel.innerHTML='';
+  data.forEach(e => {
+    el.innerHTML += `<div><strong>${e.name}</strong> — ${e.date||''} <button onclick="deleteEvent(${e.id})">Suppr</button>
+      <div id="vouchers_for_${e.id}"></div></div>`;
+    sel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+    loadVouchers(e.id);
+  });
+}
+async function deleteEvent(id){
+  if(!confirm('Supprimer événement et ses bons ?')) return;
+  await fetch(`/api/events/${id}`, {method:'DELETE'});
+  loadEvents(); loadRedemptions();
 }
 
-function deleteVolunteer(name) {
-  fetch("/delete_volunteer", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name})
-  }).then(() => location.reload());
+// Vouchers
+async function createVoucher(){
+  const event_id = document.getElementById('ev_select_for_voucher').value;
+  const name = document.getElementById('voucher_name').value.trim();
+  const max_uses = parseInt(document.getElementById('voucher_max').value || '1', 10);
+  if(!event_id || !name) return alert('Choisir événement et nom du bon');
+  await fetch('/api/event_vouchers', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({event_id, name, max_uses})});
+  document.getElementById('voucher_name').value=''; document.getElementById('voucher_max').value='1';
+  loadEvents();
 }
+async function loadVouchers(event_id){
+  const r = await fetch(`/api/event_vouchers?event_id=${event_id}`); const data = await r.json();
+  const div = document.getElementById(`vouchers_for_${event_id}`);
+  if(!div) return;
+  div.innerHTML = '<em>Types de bons :</em>';
+  data.forEach(v => {
+    div.innerHTML += `<div>${v.name} (max ${v.max_uses}) <button onclick="deleteVoucher(${v.id}, ${event_id})">Suppr</button></div>`;
+  });
+}
+async function deleteVoucher(vid, event_id){
+  if(!confirm('Supprimer ce type de bon ?')) return;
+  await fetch(`/api/event_vouchers/${vid}`, {method:'DELETE'});
+  loadVouchers(event_id);
+}
+
+// Redemptions (history)
+async function loadRedemptions(){
+  const r = await fetch('/api/redemptions'); const data = await r.json();
+  const tb = document.querySelector('#redTable tbody'); tb.innerHTML='';
+  data.forEach(rp => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${rp.nom||''} ${rp.prenom||''}</td><td>${rp.event||''}</td><td>${rp.voucher||''}</td><td>${rp.redeemed_by||''}</td><td>${rp.redeemed_at||''}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// Export members
+function exportMembers(){ window.location = '/api/export_members'; }
+
+// init
+// loadAll executed after login
 </script>
 </body>
 </html>
+
 
