@@ -1,66 +1,98 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Scanner – Moov Authume</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scanner - Moov Authume</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>🎫 Validation des bons – Moov Authume</h1>
+<main class="container">
+  <img src="/static/logo.png" class="logo" alt="Logo">
+  <h1>Scanner – Espace bénévole</h1>
+
+  <div class="card">
+    <label>Bénévole :</label>
+    <select id="volSelect"></select>
 
     <label>Événement :</label>
-    <select id="event">
-      {% for e in events %}
-        <option value="{{ e }}">{{ e }}</option>
-      {% endfor %}
-    </select>
+    <select id="eventSelect"></select>
 
-    <label>Bénévole :</label>
-    <select id="volunteer">
-      {% for v in volunteers %}
-        <option value="{{ v }}">{{ v }}</option>
-      {% endfor %}
-    </select>
+    <label>Type de bon :</label>
+    <select id="voucherSelect"></select>
 
-    <div id="reader" style="width:300px; margin:auto;"></div>
-    <p id="result" class="result"></p>
+    <div id="reader" style="width:300px; margin: 10px auto;"></div>
 
-    <script>
-      function onScanSuccess(decodedText) {
-        const [name, email, expiration] = decodedText.split("|");
-        const event = document.getElementById("event").value;
-        const volunteer = document.getElementById("volunteer").value;
+    <p class="small">Ou collez le token (ou QR décodé) :</p>
+    <input id="manualToken" placeholder="collez token ici">
+    <button onclick="manualRedeem()">Valider token</button>
 
-        fetch("/validate_qr", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({event, member: name, volunteer})
-        })
-        .then(r => r.json())
-        .then(data => {
-          const res = document.getElementById("result");
-          if (data.status === "ok") {
-            res.innerHTML = "✅ " + data.message;
-            res.style.color = "green";
-          } else {
-            res.innerHTML = "❌ " + data.message;
-            res.style.color = "red";
-          }
-        });
-      }
-
-      const html5QrCode = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(cameras => {
-        if (cameras.length) {
-          html5QrCode.start(cameras[0].id, {fps: 10, qrbox: 250}, onScanSuccess);
-        }
-      });
-    </script>
-
+    <div id="result" class="result"></div>
     <p><a href="/" class="btn">⬅ Retour à l’accueil</a></p>
   </div>
+</main>
+
+<script>
+async function loadSelects(){
+  const vres = await fetch('/api/volunteers'); const volunteers = await vres.json();
+  const volSel = document.getElementById('volSelect'); volSel.innerHTML = '';
+  volunteers.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.text = v.name; volSel.appendChild(o); });
+
+  const eres = await fetch('/api/events'); const events = await eres.json();
+  const evSel = document.getElementById('eventSelect'); evSel.innerHTML = '';
+  events.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.text = e.name + (e.date ? ` (${e.date})` : ''); evSel.appendChild(o); });
+
+  evSel.addEventListener('change', loadVouchers);
+  if(events.length) loadVouchers();
+}
+async function loadVouchers(){
+  const evId = document.getElementById('eventSelect').value;
+  const r = await fetch(`/api/event_vouchers?event_id=${evId}`); const data = await r.json();
+  const sel = document.getElementById('voucherSelect'); sel.innerHTML = '';
+  data.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.text = `${v.name} (max ${v.max_uses})`; sel.appendChild(o); });
+}
+
+async function doRedeem(token){
+  const volunteer = document.getElementById('volSelect').value || 'Anonyme';
+  const eventId = document.getElementById('eventSelect').value;
+  const voucherId = document.getElementById('voucherSelect').value;
+  const resEl = document.getElementById('result');
+  if(!eventId || !voucherId){ resEl.innerText='Choisir événement et type de bon'; resEl.style.color='red'; return; }
+
+  const r = await fetch('/api/redeem', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token, event_id: eventId, voucher_id: voucherId, volunteer: volunteer})});
+  const j = await r.json();
+  if(j.success){
+    resEl.style.color='green';
+    resEl.innerText = `✅ ${j.member.nom} ${j.member.prenom} — ${j.voucher} validé`;
+  } else if(j.redeemed_by){
+    resEl.style.color='orange';
+    resEl.innerText = `⚠️ Déjà utilisé par ${j.redeemed_by} à ${new Date(j.redeemed_at).toLocaleString()}`;
+  } else {
+    resEl.style.color='red';
+    resEl.innerText = `❌ ${j.error || 'Erreur'}`;
+  }
+}
+
+function manualRedeem(){ const t = document.getElementById('manualToken').value.trim(); if(!t) return alert('Collez le token'); doRedeem(t); }
+
+// camera scanner
+const html5QrCode = new Html5Qrcode("reader");
+Html5Qrcode.getCameras().then(cameras=>{
+  if(cameras && cameras.length){
+    html5QrCode.start(cameras[0].id, { fps: 10, qrbox: 250 }, (decodedTxt) => {
+      // our QR just contains the token (uuid). If you used another format, adapt here.
+      doRedeem(decodedTxt);
+      html5QrCode.pause(); setTimeout(()=>html5QrCode.resume(), 2000);
+    }, (err)=>{ /* ignore */ });
+  } else {
+    document.getElementById('reader').innerText = 'Aucune caméra détectée';
+  }
+}).catch(err=>{
+  document.getElementById('reader').innerText = 'Erreur caméra: '+err;
+});
+
+loadSelects();
+</script>
 </body>
 </html>
-
