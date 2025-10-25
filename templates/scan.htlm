@@ -2,43 +2,65 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner Moov Authume</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <title>Scanner – Moov Authume</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
-<body class="bg-gray-100 text-gray-900">
+<body>
+  <div class="container">
+    <h1>🎫 Validation des bons – Moov Authume</h1>
 
-  <div class="max-w-md mx-auto mt-10 bg-white p-6 rounded-2xl shadow-lg text-center">
-    <img src="/static/logo.png" alt="Logo Moov Authume" class="mx-auto w-24 mb-4">
-    <h1 class="text-2xl font-bold mb-4">Scanner un QR Code</h1>
+    <label>Événement :</label>
+    <select id="event">
+      {% for e in events %}
+        <option value="{{ e }}">{{ e }}</option>
+      {% endfor %}
+    </select>
 
-    <div id="reader" style="width: 300px; margin: auto;"></div>
-    <p id="result-message" class="mt-4 text-lg font-semibold"></p>
-  </div>
+    <label>Bénévole :</label>
+    <select id="volunteer">
+      {% for v in volunteers %}
+        <option value="{{ v }}">{{ v }}</option>
+      {% endfor %}
+    </select>
 
-  <script>
-    function onScanSuccess(decodedText) {
-      fetch("/api/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qr_data: decodedText, volunteer: "Bénévole1" })
-      })
-      .then(res => res.json())
-      .then(data => {
-        const msg = document.getElementById("result-message");
-        if (data.status === "ok") {
-          msg.textContent = "✅ Bon validé avec succès pour " + data.member;
-          msg.className = "text-green-600 font-bold mt-4";
-        } else {
-          msg.textContent = "❌ Bon déjà validé par " + data.volunteer + " à " + data.time;
-          msg.className = "text-red-600 font-bold mt-4";
+    <div id="reader" style="width:300px; margin:auto;"></div>
+    <p id="result" class="result"></p>
+
+    <script>
+      function onScanSuccess(decodedText) {
+        const [name, email, expiration] = decodedText.split("|");
+        const event = document.getElementById("event").value;
+        const volunteer = document.getElementById("volunteer").value;
+
+        fetch("/validate_qr", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({event, member: name, volunteer})
+        })
+        .then(r => r.json())
+        .then(data => {
+          const res = document.getElementById("result");
+          if (data.status === "ok") {
+            res.innerHTML = "✅ " + data.message;
+            res.style.color = "green";
+          } else {
+            res.innerHTML = "❌ " + data.message;
+            res.style.color = "red";
+          }
+        });
+      }
+
+      const html5QrCode = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras.length) {
+          html5QrCode.start(cameras[0].id, {fps: 10, qrbox: 250}, onScanSuccess);
         }
       });
-    }
+    </script>
 
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
-  </script>
+    <p><a href="/" class="btn">⬅ Retour à l’accueil</a></p>
+  </div>
 </body>
 </html>
+
