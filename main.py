@@ -1,195 +1,202 @@
 import os
-import io
-import json
+import sqlite3
 import qrcode
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file
-from flask_session import Session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, session
+from datetime import datetime
+from io import BytesIO
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "moov-authume-secret-key"
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
+app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
-# -----------------------
-# STOCKAGE LOCAL
-# -----------------------
-DATA_FILE = "data.json"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "moov2025")
+DATABASE = "database.db"
 
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({"members": [], "events": [], "volunteers": [], "scans": []}, f)
+# --- Database init ---
+def init_db():
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("""CREATE TABLE IF NOT EXISTS members (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nom TEXT, prenom TEXT, email TEXT,
+                        valid_until TEXT, qr_code TEXT UNIQUE
+                    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS volunteers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nom TEXT
+                    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nom TEXT, date TEXT,
+                        bons_boisson INTEGER DEFAULT 1,
+                        bons_repas INTEGER DEFAULT 0,
+                        bons_autre INTEGER DEFAULT 0
+                    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS scans (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        member_id INTEGER,
+                        event_id INTEGER,
+                        bon_type TEXT,
+                        volunteer TEXT,
+                        timestamp TEXT
+                    )""")
+        conn.commit()
+init_db()
 
-def read_data():
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+# --- Helper functions ---
+def generate_qr_code(data):
+    qr = qrcode.make(data)
+    buf = BytesIO()
+    qr.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
-def write_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+def get_member_by_qr(qr_code):
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, nom, prenom FROM members WHERE qr_code=?", (qr_code,))
+        return c.fetchone()
 
-# -----------------------
-# PAGE D’ACCUEIL
-# -----------------------
+# --- ROUTES ---
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# -----------------------
-# ESPACE ADMIN
-# -----------------------
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
-    data = read_data()
-    return render_template("admin.html", members=data["members"], events=data["events"], volunteers=data["volunteers"])
+    if "logged_in" not in session:
+        if request.method == "POST":
+            if request.form["password"] == ADMIN_PASSWORD:
+                session["logged_in"] = True
+            else:
+                return render_template("index.html", error="Mot de passe incorrect ⚠️")
+        else:
+            return render_template("index.html")
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM members")
+        members = c.fetchall()
+        c.execute("SELECT * FROM volunteers")
+        volunteers = c.fetchall()
+        c.execute("SELECT * FROM events")
+        events = c.fetchall()
+    return render_template("admin.html", members=members, volunteers=volunteers, events=events)
 
-# -----------------------
-# AJOUT / SUPPRESSION / MISE À JOUR DES ADHÉRENTS
-# -----------------------
 @app.route("/add_member", methods=["POST"])
 def add_member():
-    data = read_data()
-    name = request.form["name"]
+    nom = request.form["nom"]
+    prenom = request.form["prenom"]
     email = request.form["email"]
     valid_until = request.form["valid_until"]
 
-    member_id = str(len(data["members"]) + 1)
-    qr_data = f"MOOV-{member_id}"
-    data["members"].append({
-        "id": member_id,
-        "name": name,
-        "email": email,
-        "valid_until": valid_until,
-        "qr": qr_data
-    })
-    write_data(data)
+    qr_code_data = f"{nom}-{prenom}-{email}"
+    qr_code_filename = f"static/qrcodes/{secure_filename(qr_code_data)}.png"
+
+    os.makedirs("static/qrcodes", exist_ok=True)
+    if not os.path.exists(qr_code_filename):
+        img = qrcode.make(qr_code_data)
+        img.save(qr_code_filename)
+
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO members (nom, prenom, email, valid_until, qr_code) VALUES (?, ?, ?, ?, ?)",
+                  (nom, prenom, email, valid_until, qr_code_data))
+        conn.commit()
     return redirect(url_for("admin"))
 
-@app.route("/delete_member/<member_id>")
-def delete_member(member_id):
-    data = read_data()
-    data["members"] = [m for m in data["members"] if m["id"] != member_id]
-    write_data(data)
+@app.route("/delete_member", methods=["POST"])
+def delete_member():
+    member_id = request.form["id"]
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM members WHERE id=?", (member_id,))
+        conn.commit()
     return redirect(url_for("admin"))
 
-@app.route("/extend_member/<member_id>", methods=["POST"])
-def extend_member(member_id):
-    data = read_data()
-    for m in data["members"]:
-        if m["id"] == member_id:
-            m["valid_until"] = request.form["valid_until"]
-    write_data(data)
-    return redirect(url_for("admin"))
-
-# -----------------------
-# GÉNÉRATION DU QR CODE
-# -----------------------
-@app.route("/qrcode/<member_id>")
-def generate_qrcode(member_id):
-    data = read_data()
-    member = next((m for m in data["members"] if m["id"] == member_id), None)
-    if not member:
-        return "Membre introuvable", 404
-    img = qrcode.make(member["qr"])
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return send_file(buf, mimetype="image/png")
-
-# -----------------------
-# GESTION DES ÉVÉNEMENTS ET BONS
-# -----------------------
-@app.route("/add_event", methods=["POST"])
-def add_event():
-    data = read_data()
-    name = request.form["event_name"]
-    date = request.form["event_date"]
-    drink_limit = int(request.form["drink_limit"])
-    food_limit = int(request.form["food_limit"])
-
-    event_id = str(len(data["events"]) + 1)
-    data["events"].append({
-        "id": event_id,
-        "name": name,
-        "date": date,
-        "limits": {"boisson": drink_limit, "repas": food_limit}
-    })
-    write_data(data)
-    return redirect(url_for("admin"))
-
-@app.route("/delete_event/<event_id>")
-def delete_event(event_id):
-    data = read_data()
-    data["events"] = [e for e in data["events"] if e["id"] != event_id]
-    write_data(data)
-    return redirect(url_for("admin"))
-
-# -----------------------
-# GESTION DES BÉNÉVOLES
-# -----------------------
 @app.route("/add_volunteer", methods=["POST"])
 def add_volunteer():
-    data = read_data()
-    name = request.form["volunteer_name"]
-    vid = str(len(data["volunteers"]) + 1)
-    data["volunteers"].append({"id": vid, "name": name})
-    write_data(data)
+    nom = request.form["nom"]
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO volunteers (nom) VALUES (?)", (nom,))
+        conn.commit()
     return redirect(url_for("admin"))
 
-@app.route("/delete_volunteer/<vol_id>")
-def delete_volunteer(vol_id):
-    data = read_data()
-    data["volunteers"] = [v for v in data["volunteers"] if v["id"] != vol_id]
-    write_data(data)
+@app.route("/delete_volunteer", methods=["POST"])
+def delete_volunteer():
+    volunteer_id = request.form["id"]
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM volunteers WHERE id=?", (volunteer_id,))
+        conn.commit()
     return redirect(url_for("admin"))
 
-# -----------------------
-# PAGE SCAN
-# -----------------------
-@app.route("/scan")
+@app.route("/add_event", methods=["POST"])
+def add_event():
+    nom = request.form["nom"]
+    date = request.form["date"]
+    bons_boisson = int(request.form.get("bons_boisson", 0))
+    bons_repas = int(request.form.get("bons_repas", 0))
+    bons_autre = int(request.form.get("bons_autre", 0))
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("""INSERT INTO events (nom, date, bons_boisson, bons_repas, bons_autre)
+                     VALUES (?, ?, ?, ?, ?)""",
+                     (nom, date, bons_boisson, bons_repas, bons_autre))
+        conn.commit()
+    return redirect(url_for("admin"))
+
+@app.route("/benevole")
+def benevole():
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM events")
+        events = c.fetchall()
+        c.execute("SELECT * FROM volunteers")
+        volunteers = c.fetchall()
+    return render_template("benevole.html", events=events, volunteers=volunteers)
+
+@app.route("/scan", methods=["POST"])
 def scan():
-    data = read_data()
-    return render_template("scan.html", events=data["events"], volunteers=data["volunteers"])
+    data = request.json
+    qr_code = data["qr"]
+    event_id = data["event_id"]
+    volunteer = data["volunteer"]
+    bon_type = data["bon_type"]
 
-@app.route("/validate", methods=["POST"])
-def validate():
-    data = read_data()
-    code = request.form["code"]
-    event_id = request.form["event_id"]
-    volunteer_id = request.form["volunteer_id"]
-    bon_type = request.form["bon_type"]
-
-    member = next((m for m in data["members"] if m["qr"] == code), None)
+    member = get_member_by_qr(qr_code)
     if not member:
         return jsonify({"status": "error", "message": "QR code invalide ❌"})
 
-    event = next((e for e in data["events"] if e["id"] == event_id), None)
-    volunteer = next((v for v in data["volunteers"] if v["id"] == volunteer_id), None)
+    member_id = member[0]
+    member_name = f"{member[1]} {member[2]}"
 
-    # Cherche si déjà scanné
-    scans = [s for s in data["scans"] if s["member_id"] == member["id"] and s["event_id"] == event_id and s["bon_type"] == bon_type]
-    limit = event["limits"].get(bon_type, 1)
+    with sqlite3.connect(DATABASE) as conn:
+        c = conn.cursor()
+        c.execute("SELECT bons_boisson, bons_repas, bons_autre FROM events WHERE id=?", (event_id,))
+        event = c.fetchone()
+        if not event:
+            return jsonify({"status": "error", "message": "Événement introuvable ❌"})
 
-    if len(scans) >= limit:
-        last = scans[-1]
-        return jsonify({
-            "status": "error",
-            "message": f"Déjà utilisé 😅 — par {last['volunteer_name']} à {last['time']}"
-        })
+        max_bons = {"boisson": event[0], "repas": event[1], "autre": event[2]}
+        c.execute("SELECT COUNT(*) FROM scans WHERE member_id=? AND event_id=? AND bon_type=?",
+                  (member_id, event_id, bon_type))
+        used = c.fetchone()[0]
 
-    data["scans"].append({
-        "member_id": member["id"],
-        "member_name": member["name"],
-        "event_id": event_id,
-        "event_name": event["name"],
-        "volunteer_id": volunteer_id,
-        "volunteer_name": volunteer["name"],
-        "bon_type": bon_type,
-        "time": datetime.now().strftime("%H:%M:%S")
-    })
+        if used >= max_bons[bon_type]:
+            c.execute("""SELECT volunteer, timestamp FROM scans
+                         WHERE member_id=? AND event_id=? AND bon_type=? ORDER BY id DESC LIMIT 1""",
+                         (member_id, event_id, bon_type))
+            last = c.fetchone()
+            return jsonify({"status": "used", "message": f"Bon déjà utilisé par {last[0]} à {last[1]} 🚫"})
 
-    write_data(data)
-    return jsonify({"status": "success", "message": f"Bon {bon_type} validé pour {member['name']} ✅"})
+        c.execute("""INSERT INTO scans (member_id, event_id, bon_type, volunteer, timestamp)
+                     VALUES (?, ?, ?, ?, ?)""",
+                     (member_id, event_id, bon_type, volunteer, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+
+    return jsonify({"status": "ok", "message": f"✅ Bon {bon_type} validé pour {member_name} !"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
