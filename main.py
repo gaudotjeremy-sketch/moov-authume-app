@@ -8,74 +8,73 @@ Session(app)
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin2025")
 
-members = []
-volunteers = []
-events = []
-validated = {}  # {event_name: [(member_name, time, volunteer_name)]}
+members = []      # [{name, email, expiration, qr}]
+volunteers = []   # [name]
+events = []       # [name]
+validated = {}    # {event_name: [(member_name, time, volunteer_name)]}
+
+
+def generate_qr(name, email, expiration):
+    data = f"{name}|{email}|{expiration}"
+    qr_img = qrcode.make(data)
+    buf = io.BytesIO()
+    qr_img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/admin")
 def admin_page():
     return render_template("admin.html", members=members, volunteers=volunteers, events=events)
+
 
 @app.route("/get-admin-password")
 def get_admin_password():
     return jsonify({"password": ADMIN_PASSWORD})
 
+
 @app.route("/scan")
 def scan_page():
     return render_template("scan.html", events=events, volunteers=volunteers)
+
 
 @app.route("/add_member", methods=["POST"])
 def add_member():
     data = request.get_json()
     name = data["name"]
     email = data["email"]
-    expiration = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
-    qr_data = f"{name}|{email}|{expiration}"
-    qr_img = qrcode.make(qr_data)
-    buf = io.BytesIO()
-    qr_img.save(buf, format="PNG")
-    qr_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    expiration = data["expiration"]
 
+    qr_base64 = generate_qr(name, email, expiration)
     members.append({"name": name, "email": email, "expiration": expiration, "qr": qr_base64})
+
     return jsonify({"status": "ok", "qr": qr_base64})
+
 
 @app.route("/delete_member", methods=["POST"])
 def delete_member():
     data = request.get_json()
-    name = data["name"]
     global members
-    members = [m for m in members if m["name"] != name]
+    members = [m for m in members if m["name"] != data["name"]]
     return jsonify({"status": "ok"})
+
 
 @app.route("/extend_member", methods=["POST"])
 def extend_member():
     data = request.get_json()
     name = data["name"]
+    new_date = data["new_date"]
     for m in members:
         if m["name"] == name:
-            new_date = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
             m["expiration"] = new_date
+            m["qr"] = generate_qr(m["name"], m["email"], new_date)
             return jsonify({"status": "ok", "new_date": new_date})
     return jsonify({"status": "error"})
 
-@app.route("/add_volunteer", methods=["POST"])
-def add_volunteer():
-    data = request.get_json()
-    volunteers.append(data["name"])
-    return jsonify({"status": "ok"})
-
-@app.route("/delete_volunteer", methods=["POST"])
-def delete_volunteer():
-    data = request.get_json()
-    name = data["name"]
-    global volunteers
-    volunteers = [v for v in volunteers if v != name]
-    return jsonify({"status": "ok"})
 
 @app.route("/add_event", methods=["POST"])
 def add_event():
@@ -84,14 +83,15 @@ def add_event():
     validated[data["name"]] = []
     return jsonify({"status": "ok"})
 
+
 @app.route("/delete_event", methods=["POST"])
 def delete_event():
     data = request.get_json()
-    name = data["name"]
     global events
-    events = [e for e in events if e != name]
-    validated.pop(name, None)
+    events = [e for e in events if e != data["name"]]
+    validated.pop(data["name"], None)
     return jsonify({"status": "ok"})
+
 
 @app.route("/validate_qr", methods=["POST"])
 def validate_qr():
@@ -111,6 +111,7 @@ def validate_qr():
     validated[event].append((member_name, time, volunteer))
     return jsonify({"status": "ok", "message": f"Validation enregistrée à {time}"})
 
+
 @app.route("/export_members")
 def export_members():
     csv_data = "Nom,Email,Expiration\n"
@@ -118,5 +119,7 @@ def export_members():
         csv_data += f"{m['name']},{m['email']},{m['expiration']}\n"
     return send_file(io.BytesIO(csv_data.encode()), mimetype="text/csv", as_attachment=True, download_name="adherents.csv")
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
