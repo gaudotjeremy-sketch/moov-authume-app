@@ -1,23 +1,97 @@
-/* static/style.css */
-:root{--primary:#0b72ff;--muted:#6b7280;--bg:#f5f7fb}
-*{box-sizing:border-box}
-body{font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);margin:0;color:#111}
-.center{max-width:720px;margin:40px auto;text-align:center}
-.container{max-width:1100px;margin:20px auto;padding:18px}
-.card{background:#fff;padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-bottom:12px}
-.logo{width:120px;margin:0 auto;display:block}
-h1{margin:8px 0 6px;font-size:22px;color:var(--primary)}
-.lead{color:var(--muted)}
-.buttons{display:flex;gap:12px;justify-content:center;margin:14px 0}
-.btn{display:inline-block;padding:10px 16px;background:var(--primary);color:#fff;border-radius:10px;text-decoration:none;font-weight:600}
-.btn:hover{opacity:.95}
-.row{display:flex;gap:12px;flex-wrap:wrap}
-input,select,textarea{padding:8px;border:1px solid #e5e7eb;border-radius:8px;width:100%;margin:6px 0}
-.form-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:8px;border-bottom:1px solid #f3f4f6;text-align:left}
-small,.small{font-size:13px;color:var(--muted)}
-.hidden{display:none}
-.center-text{text-align:center}
-.result{font-weight:700;margin-top:12px}
-@media(max-width:850px){ .form-row{grid-template-columns:1fr} .row{flex-direction:column} .logo{width:100px} }
+body {
+    font-family: "Poppins", sans-serif;
+    background: linear-gradient(135deg, #6dd5fa, #2980b9);
+    color: #fff;
+    text-align: center;
+    margin: 0;
+}
+
+.container {
+    margin: 40px auto;
+    max-width: 900px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
+}
+
+.logo {
+    width: 120px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+h1, h2 {
+    color: #fff;
+}
+
+.button {
+    display: inline-block;
+    background: #fff;
+    color: #2980b9;
+    padding: 10px 20px;
+    margin: 10px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.button:hover {
+    background: #2980b9;
+    color: #fff;
+}
+
+.button.danger {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.button.danger:hover {
+    background: #c0392b;
+}
+
+.form-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+input, select, button {
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+
+th {
+    background: rgba(0,0,0,0.2);
+}
+
+.message {
+    margin-top: 20px;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.message.success {
+    color: #2ecc71;
+}
+
+.message.error {
+    color: #e74c3c;
+}
+
