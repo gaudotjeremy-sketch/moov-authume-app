@@ -167,4 +167,29 @@ def validate():
     volunteer = next((v for v in data["volunteers"] if v["id"] == volunteer_id), None)
 
     # Cherche si déjà scanné
-    scans = [s for s in data["sca]()]()
+    scans = [s for s in data["scans"] if s["member_id"] == member["id"] and s["event_id"] == event_id and s["bon_type"] == bon_type]
+    limit = event["limits"].get(bon_type, 1)
+
+    if len(scans) >= limit:
+        last = scans[-1]
+        return jsonify({
+            "status": "error",
+            "message": f"Déjà utilisé 😅 — par {last['volunteer_name']} à {last['time']}"
+        })
+
+    data["scans"].append({
+        "member_id": member["id"],
+        "member_name": member["name"],
+        "event_id": event_id,
+        "event_name": event["name"],
+        "volunteer_id": volunteer_id,
+        "volunteer_name": volunteer["name"],
+        "bon_type": bon_type,
+        "time": datetime.now().strftime("%H:%M:%S")
+    })
+
+    write_data(data)
+    return jsonify({"status": "success", "message": f"Bon {bon_type} validé pour {member['name']} ✅"})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
